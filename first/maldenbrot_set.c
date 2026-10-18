@@ -51,8 +51,7 @@ static void *find_points(void *argument) {
             break;
         }
         pthread_mutex_unlock(&points_mutex);
-
-        /* Sample x in [-2, 1] and y in [-1.5, 1.5]. */
+        
         x = -2.0 + 3.0 * my_drand(&seed);
         y = -1.5 + 3.0 * my_drand(&seed);
 
