@@ -4,6 +4,23 @@
 #include "my_rand.h"
 #include "timer.h"
 
+#ifdef USE_CUSTOM_RWLOCK
+#include "idk.h"
+typedef custom_rwlock_t rwlock_t;
+#define RWLOCK_INIT(lock) custom_rwlock_init(lock)
+#define RWLOCK_DESTROY(lock) custom_rwlock_destroy(lock)
+#define RWLOCK_RDLOCK(lock) custom_rwlock_rdlock(lock)
+#define RWLOCK_WRLOCK(lock) custom_rwlock_wrlock(lock)
+#define RWLOCK_UNLOCK(lock) custom_rwlock_unlock(lock)
+#else
+typedef pthread_rwlock_t rwlock_t;
+#define RWLOCK_INIT(lock) pthread_rwlock_init((lock), NULL)
+#define RWLOCK_DESTROY(lock) pthread_rwlock_destroy(lock)
+#define RWLOCK_RDLOCK(lock) pthread_rwlock_rdlock(lock)
+#define RWLOCK_WRLOCK(lock) pthread_rwlock_wrlock(lock)
+#define RWLOCK_UNLOCK(lock) pthread_rwlock_unlock(lock)
+#endif
+
 /* Random ints are less than MAX_KEY */
 const int MAX_KEY = 100000000;
 
@@ -21,7 +38,7 @@ int         total_ops;
 double      insert_percent;
 double      search_percent;
 double      delete_percent;
-pthread_rwlock_t    rwlock;
+rwlock_t            rwlock;
 pthread_mutex_t     count_mutex;
 int         member_count = 0, insert_count = 0, delete_count = 0;
 
@@ -73,7 +90,7 @@ int main(int argc, char* argv[]) {
 
    thread_handles = malloc(thread_count*sizeof(pthread_t));
    pthread_mutex_init(&count_mutex, NULL);
-   pthread_rwlock_init(&rwlock, NULL);
+   RWLOCK_INIT(&rwlock);
 
    GET_TIME(start);
    for (i = 0; i < thread_count; i++)
@@ -95,7 +112,7 @@ int main(int argc, char* argv[]) {
 #  endif
 
    Free_list();
-   pthread_rwlock_destroy(&rwlock);
+   RWLOCK_DESTROY(&rwlock);
    pthread_mutex_destroy(&count_mutex);
    free(thread_handles);
 
@@ -266,19 +283,19 @@ void* Thread_work(void* rank) {
       which_op = my_drand(&seed);
       val = my_rand(&seed) % MAX_KEY;
       if (which_op < search_percent) {
-         pthread_rwlock_rdlock(&rwlock);
+         RWLOCK_RDLOCK(&rwlock);
          Member(val);
-         pthread_rwlock_unlock(&rwlock);
+         RWLOCK_UNLOCK(&rwlock);
          my_member_count++;
       } else if (which_op < search_percent + insert_percent) {
-         pthread_rwlock_wrlock(&rwlock);
+         RWLOCK_WRLOCK(&rwlock);
          Insert(val);
-         pthread_rwlock_unlock(&rwlock);
+         RWLOCK_UNLOCK(&rwlock);
          my_insert_count++;
       } else { /* delete */
-         pthread_rwlock_wrlock(&rwlock);
+         RWLOCK_WRLOCK(&rwlock);
          Delete(val);
-         pthread_rwlock_unlock(&rwlock);
+         RWLOCK_UNLOCK(&rwlock);
          my_delete_count++;
       }
    }  /* for */
